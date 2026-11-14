@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Operación Extracción: Sobrevive al Apocalipsis — FPS 3D con Three.js" />
+    <title>Operación Extracción: Sobrevive al Apocalipsis</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230b0f0d'/%3E%3Ccircle cx='32' cy='32' r='16' fill='none' stroke='%23d94b2b' stroke-width='5'/%3E%3Cpath d='M32 6v16M32 42v16M6 32h16M42 32h16' stroke='%23d94b2b' stroke-width='5'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="game-root"></div>
+
+      <!-- CARGA -->
+      <section id="loading" class="screen">
+        <div class="loading-box">
+          <div class="spinner"></div>
+          <p id="loading-text">Cargando ciudad y modelos 3D…</p>
+          <p id="loading-error" class="error hidden"></p>
+        </div>
+      </section>
+
+      <!-- MENÚ PRINCIPAL (la escena 3D de la ciudad se ve de fondo) -->
+      <section id="menu" class="screen hidden">
+        <div class="menu-shade"></div>
+        <div class="menu-content">
+          <p class="eyebrow">Computación Gráfica y Visual · UPN</p>
+          <h1 class="game-title">
+            <span class="t-small">OPERACIÓN</span>
+            <span class="t-big">EXTRACCIÓN</span>
+            <span class="t-sub">SOBREVIVE AL APOCALIPSIS</span>
+          </h1>
+          <nav class="menu-buttons">
+            <button id="btn-play" class="btn btn-primary">JUGAR</button>
+            <button id="btn-instructions" class="btn">INSTRUCCIONES</button>
+            <button id="btn-credits" class="btn">CRÉDITOS</button>
+          </nav>
+          <p id="asset-status" class="asset-status"></p>
+        </div>
+
+        <div id="panel-instructions" class="panel hidden" role="dialog" aria-label="Instrucciones">
+          <h2>INSTRUCCIONES</h2>
+          <p class="lead">Eres uno de los últimos sobrevivientes. Cruza la ciudad abandonada, administra tu munición y llega a la <strong class="ok">zona de extracción</strong> (haz de luz verde al norte).</p>
+          <div class="keys">
+            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Moverse</span></div>
+            <div><kbd>Mouse</kbd><span>Apuntar / mirar</span></div>
+            <div><kbd>Clic izq.</kbd><span>Disparar (un clic = un disparo)</span></div>
+            <div><kbd>1</kbd><span>Arma principal: Fusil de asalto</span></div>
+            <div><kbd>2</kbd><span>Arma secundaria: Pistola</span></div>
+            <div><kbd>Esc</kbd><span>Pausa</span></div>
+          </div>
+          <ul class="tips">
+            <li>Cada zombi aguanta <strong>2 impactos</strong>. Si te toca, pierdes.</li>
+            <li>No hay recarga: recoge las <strong>cajas de munición</strong> (naranja = fusil, celeste = pistola).</li>
+            <li>Los zombis permanecen inactivos hasta que te acercas. Puedes rodearlos o evitarlos.</li>
+          </ul>
+          <button class="btn btn-small" data-close>VOLVER</button>
+        </div>
+
+        <div id="panel-credits" class="panel hidden" role="dialog" aria-label="Créditos">
+          <h2>CRÉDITOS</h2>
+          <p><strong>Operación Extracción: Sobrevive al Apocalipsis</strong><br />Proyecto del curso Computación Gráfica y Visual — Universidad Privada del Norte (UPN), T3.</p>
+          <p>Tecnologías: JavaScript, HTML5, CSS3, Three.js (WebGL), Vite.</p>
+          <p id="credits-assets" class="small"></p>
+          <p class="small">Audio: sintetizado en tiempo real con Web Audio API. Texturas: generadas proceduralmente con canvas.</p>
+          <button class="btn btn-small" data-close>VOLVER</button>
+        </div>
+      </section>
+
+      <!-- HUD -->
+      <section id="hud" class="hidden" aria-live="polite">
+        <div id="vignette-danger"></div>
+        <div id="vignette-hurt"></div>
+        <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+        <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+
+        <div id="mission" class="hud-card">
+          <div class="hud-label">MISIÓN · <span id="mission-stage">INICIO</span></div>
+          <div id="mission-text">Sal de la zona segura</div>
+          <div class="objective"><span id="objective-arrow">➤</span><span id="objective-dist">—</span></div>
+        </div>
+
+        <div id="threat" class="hud-card">
+          <canvas id="radar" width="150" height="150"></canvas>
+          <div class="hud-label">AMENAZAS: <span id="threat-count">0</span></div>
+          <div class="hud-sub">Vivos: <span id="zombies-left">0</span> · Eliminados: <span id="kills">0</span></div>
+        </div>
+
+        <div id="toasts"></div>
+
+        <div id="weapon-panel" class="hud-card">
+          <div class="slots">
+            <div class="slot" data-slot="1"><b>1</b><span id="slot1-name">FUSIL</span><em id="slot1-ammo">0</em></div>
+            <div class="slot" data-slot="2"><b>2</b><span id="slot2-name">PISTOLA</span><em id="slot2-ammo">0</em></div>
+          </div>
+          <div class="weapon-name" id="weapon-name">FUSIL DE ASALTO</div>
+          <div class="ammo"><span id="ammo-current">0</span><small id="ammo-max">/ 0</small></div>
+          <div id="ammo-warning" class="ammo-warning"></div>
+        </div>
+      </section>
+
+      <!-- PAUSA -->
+      <section id="pause" class="screen hidden">
+        <div class="screen-box">
+          <h2>PAUSA</h2>
+          <p>Haz clic en <strong>CONTINUAR</strong> para volver a capturar el mouse.</p>
+          <div class="menu-buttons">
+            <button id="btn-resume" class="btn btn-primary">CONTINUAR</button>
+            <button id="btn-pause-menu" class="btn">MENÚ PRINCIPAL</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- GAME OVER -->
+      <section id="gameover" class="screen screen-red hidden">
+        <div class="screen-box">
+          <h2 class="big-red">GAME OVER</h2>
+          <p>Un zombi te alcanzó. La infección continúa…</p>
+          <div class="menu-buttons">
+            <button id="btn-gameover-restart" class="btn btn-primary">REINICIAR</button>
+            <button id="btn-gameover-menu" class="btn">MENÚ PRINCIPAL</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- VICTORIA -->
+      <section id="victory" class="screen screen-green hidden">
+        <div class="screen-box">
+          <h2 class="big-green">¡MISIÓN COMPLETADA!</h2>
+          <p class="lead">Has llegado a la zona de extracción.</p>
+          <p id="victory-stats" class="small"></p>
+          <div class="menu-buttons">
+            <button id="btn-victory-restart" class="btn btn-primary">JUGAR DE NUEVO</button>
+            <button id="btn-victory-menu" class="btn">MENÚ PRINCIPAL</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
