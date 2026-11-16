@@ -2,6 +2,7 @@ import { CONFIG } from '../config.js';
 import { createFallbackZombie } from '../systems/AssetLoader.js';
 import { Zombie } from './Zombie.js';
 import { ZombieAI, ZombieState } from './ZombieAI.js';
+import { FlowField } from './FlowField.js';
 
 /**
  * Crea y gestiona todos los zombis: carga de modelos, actualización de IA, separación entre
@@ -12,7 +13,8 @@ export class ZombieManager {
     this.scene = scene;
     this.collision = collision;
     this.assets = assets;
-    this.ai = new ZombieAI(collision);
+    this.flow = new FlowField(collision);          // se construye con los colisionadores ya cargados
+    this.ai = new ZombieAI(collision, this.flow);
     this.zombies = [];
     this._alive = [];
     this._hitboxes = [];
@@ -66,9 +68,15 @@ export class ZombieManager {
 
   /** @param {{x:number,z:number}} player */
   update(dt, time, player) {
+    if (this._alive.some((z) => z.state === ZombieState.ACTIVE)) this.flow.update(player, dt);
     for (const z of this._alive) this.ai.update(z, player, dt);
     this._separate();
     for (const z of this.zombies) z.update(dt, time);
+  }
+
+  /** MODO CAZA (al salir de la zona segura): los zombis detectan al jugador desde mucho más lejos. */
+  setHunt(on) {
+    for (const z of this.zombies) z.setHunt(on ? CONFIG.HUNT : null);
   }
 
   /** Evita que los zombis activos se amontonen en el mismo punto. */

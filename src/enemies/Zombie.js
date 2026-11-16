@@ -32,6 +32,8 @@ export class Zombie {
     this.speed = type.speed;
     this.detectionRange = detect ?? type.detect;
     this.loseFactor = type.loseFactor;
+    this.baseDetect = this.detectionRange;   // valores propios (el modo caza los amplía temporalmente)
+    this.baseLoseFactor = this.loseFactor;
     this.radius = 0.45;
     this.state = ZombieState.IDLE;
     this.heading = 0;
@@ -121,6 +123,12 @@ export class Zombie {
     }
   }
 
+  /** Modo caza: amplía el rango de detección (nunca lo reduce). Con `null` vuelve a los valores propios. */
+  setHunt(hunt) {
+    this.detectionRange = hunt ? Math.max(this.baseDetect, hunt.range) : this.baseDetect;
+    this.loseFactor = hunt ? hunt.loseFactor : this.baseLoseFactor;
+  }
+
   activate() {
     if (this.state !== ZombieState.IDLE) return;
     this.state = ZombieState.ACTIVE;
@@ -163,6 +171,7 @@ export class Zombie {
   reset() {
     this.health = this.maxHealth;
     this.state = ZombieState.IDLE;
+    this.setHunt(null);
     this.position.set(this.spawn.x, 0, this.spawn.z);
     this.hitbox.layers.set(0);
     this.body.rotation.set(0, 0, 0);

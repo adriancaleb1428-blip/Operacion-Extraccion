@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  VEHICLES, BARRIERS, FIRE_BARRELS, HAZARD_ZONES, SAFE_ZONE, HELICOPTER,
+  VEHICLES, BARRIERS, FIRE_BARRELS, HAZARD_ZONES, SAFE_ZONE, HELICOPTER, POLE, EXT_COMPOUND, EXT_GATE, extractionWalls,
   generateBuildings, generateLamps, generateYardProps, buildColliders,
 } from './levelData.js';
 import { createFacadeTextures, createRoofTexture, createHazardTexture, createSignTexture } from './Textures.js';
@@ -33,6 +33,7 @@ export class WorldBuilder {
     this._safeZone();
     this._hazardZones();
     this._fireBarrels();
+    this._extractionCompound();
     this.disposables.push(...mergeStaticMeshes(this.root)); // rendimiento: menos draw calls
     this.collision.addBoxes(buildColliders());
     return this;
@@ -123,21 +124,42 @@ export class WorldBuilder {
 
     // Tiendas militares y suministros decorativos (sin munición: la munición está en el escenario)
     const canvas = mat(0x4a5238, { rough: 1 });
-    for (const [x, z] of [[-12, 98], [12, 99]]) {
+    for (const [x, z] of [[-12, s.z2 - 6], [12, s.z2 - 5]]) {
       const tent = new THREE.Mesh(new THREE.ConeGeometry(3, 2.6, 4), canvas);
       tent.rotation.y = Math.PI / 4; tent.position.set(x, 1.3, z); tent.castShadow = true;
       this.root.add(tent);
       this.disposables.push(tent.geometry);
     }
-    part(this.root, 2.4, 1.2, 1.2, 0, 0.6, 100, mat(0x5a4a2a, { rough: 1 }));
+    part(this.root, 2.4, 1.2, 1.2, 0, 0.6, s.z2 - 3, mat(0x5a4a2a, { rough: 1 }));
 
     // Reflector de la zona segura (única luz cálida de inicio)
-    part(this.root, 0.2, 6, 0.2, -8, 3, 90, mat(0x2a2c30, { metal: 0.6 }));
-    part(this.root, 1.2, 0.4, 0.6, -8, 6.1, 90, mat(0xfff2c0, { emissive: 0xffe9a0, emissiveIntensity: 1.5 }), { cast: false });
+    part(this.root, 0.2, 6, 0.2, POLE.x, 3, POLE.z, mat(0x2a2c30, { metal: 0.6 }));
+    part(this.root, 1.2, 0.4, 0.6, POLE.x, 6.1, POLE.z, mat(0xfff2c0, { emissive: 0xffe9a0, emissiveIntensity: 1.5 }), { cast: false });
     const light = new THREE.PointLight(0xffe2a8, 420, 46, 2);
-    light.position.set(-6, 6, 91);
+    light.position.set(POLE.x + 2, 6, POLE.z + 1);
     this.root.add(light);
     this.fireLights.push({ light, base: 420, flicker: 0.04 });
+  }
+
+  /** Recinto de extracción: muros altos de concreto con UNA entrada estrecha en el lado oeste. */
+  _extractionCompound() {
+    const concrete = mat(0x6b6d6f, { rough: 1 });
+    const trim = mat(0x2a2b2d, { rough: 0.9 });
+    for (const w of extractionWalls()) {
+      const sx = w.maxX - w.minX, sz = w.maxZ - w.minZ, h = w.maxY;
+      part(this.root, sx, h, sz, (w.minX + w.maxX) / 2, h / 2, (w.minZ + w.maxZ) / 2, concrete, { receive: true });
+      part(this.root, sx + 0.1, 0.3, sz + 0.1, (w.minX + w.maxX) / 2, h + 0.15, (w.minZ + w.maxZ) / 2, trim);
+    }
+    // Pilares de la entrada y un letrero pequeño y desgastado (solo se lee de cerca)
+    const g = EXT_GATE, c = EXT_COMPOUND;
+    for (const z of [g.z1 - 0.4, g.z2 + 0.4]) part(this.root, 1.2, 6, 1.2, c.x1, 3, z, trim);
+    const tex = createSignTexture('RESCATE', { bg: '#1a1410', fg: '#d8c8a0', border: '#8a6a2a', size: 70, w: 256, h: 96 });
+    this.disposables.push(tex);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.1), new THREE.MeshBasicMaterial({ map: tex }));
+    sign.position.set(c.x1 - 0.7, 5.4, (g.z1 + g.z2) / 2);
+    sign.rotation.y = -Math.PI / 2;
+    this.root.add(sign);
+    this.disposables.push(sign.geometry, sign.material);
   }
 
   _hazardZones() {
@@ -161,7 +183,7 @@ export class WorldBuilder {
 
   _fireBarrels() {
     // Solo algunos barriles llevan PointLight (límite de luces para rendimiento)
-    const lit = new Set([2, 3]);
+    const lit = new Set([0, 1]);
     FIRE_BARRELS.forEach((f, i) => {
       const barrel = createFireBarrel(f);
       this.root.add(barrel);

@@ -170,7 +170,7 @@ export function createLamp(l) {
   const g = new THREE.Group();
   const metal = mat(0x2a2c30, { rough: 0.6, metal: 0.7 });
   part(g, 0.18, 7, 0.18, 0, 3.5, 0, metal);
-  const dir = l.x < 0 ? 1 : -1; // brazo hacia la calle
+  const dir = l.dir ?? (l.x < 0 ? 1 : -1); // brazo hacia la calle
   part(g, 1.6, 0.12, 0.12, dir * 0.8, 6.9, 0, metal);
   part(g, 0.6, 0.15, 0.3, dir * 1.5, 6.82, 0, mat(0xcfc6a0, { emissive: Math.random() < 0.25 ? 0x7a6a30 : 0x1a1608, emissiveIntensity: 1 }), { cast: false });
   g.position.set(l.x, 0, l.z);

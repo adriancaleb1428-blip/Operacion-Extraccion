@@ -81,7 +81,7 @@ export class Environment {
       this.disposables.push(tex.map, tex.emissiveMap);
       return tex;
     });
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 120; i++) {
       const side = i % 4;
       const along = rng();
       const dist = 12 + rng() * 55;

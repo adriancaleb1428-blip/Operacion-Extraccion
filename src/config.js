@@ -25,7 +25,7 @@ export const CONFIG = {
 
   mission: {
     extractionRadius: 5,      // radio de la zona de extracción (m)
-    finalStageDistance: 55,   // distancia a la extracción que activa la etapa FINAL
+    finalStageDistance: 80,   // distancia a la extracción que activa la etapa FINAL (y revela la señal)
     instructionsSeconds: 9,   // tiempo que se muestran las instrucciones iniciales
   },
 
@@ -45,7 +45,7 @@ export const CONFIG = {
       model: {
         path: asset('models/weapons/rifle.glb'),
         length: 0.55,              // largo del modelo en pantalla (m) -> se escala automáticamente
-        rotationY: 0,               // gira el modelo si el GLB real apunta a otro lado (grados)
+        rotationY: 180,             // los GLB de Quaternius apuntan a +Z: se giran 180° para apuntar a -Z (grados)
         viewPosition: [0.14, -0.17, -0.5], // posición en primera persona (x derecha, y arriba, z adelante negativa)
       },
       ammo: { initial: 14, max: 60 },
@@ -61,7 +61,7 @@ export const CONFIG = {
       model: {
         path: asset('models/weapons/pistol.glb'),
         length: 0.3,
-        rotationY: 0,
+        rotationY: 180,
         viewPosition: [0.11, -0.12, -0.36],
       },
       ammo: { initial: 10, max: 36 },
@@ -77,6 +77,10 @@ export const CONFIG = {
     // Munición que otorga cada tipo de caja (se suma sin pasar el máximo del arma)
     ammoBox: { rifle: 8, pistol: 6 },
   },
+
+  // MODO CAZA: al salir de la zona segura, TODOS los zombis amplían su rango de detección a `range` metros
+  // (y no lo pierden hasta que el jugador se aleja `range * loseFactor`). Así vienen hacia ti desde lejos.
+  HUNT: { range: 75, loseFactor: 1.8 },
 
   // Tipos de zombi. `detect` = distancia de detección (m); `loseFactor` = factor de histéresis
   // (se vuelve INACTIVO si el jugador se aleja más de detect * loseFactor).

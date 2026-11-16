@@ -90,6 +90,9 @@ kbd { display: inline-block; min-width: 2rem; text-align: center; padding: 0.22r
 
 #mission { top: 16px; left: 16px; min-width: 250px; max-width: 360px; }
 #mission-stage { color: var(--warn); }
+.heading { color: var(--info); font-weight: 800; letter-spacing: 0.1em; }
+.objective { color: var(--muted); }
+.objective.strong { color: var(--ok); }
 #mission-text { margin-top: 0.3rem; font-size: 0.95rem; line-height: 1.35; }
 .objective { margin-top: 0.4rem; display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: var(--ok); }
 #objective-arrow { display: inline-block; font-size: 1.2rem; transition: transform 0.08s linear; }

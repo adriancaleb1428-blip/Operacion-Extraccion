@@ -11,7 +11,7 @@ export class HUD {
     this.el = {
       weaponName: $('weapon-name'), ammoCur: $('ammo-current'), ammoMax: $('ammo-max'), ammoBox: this.root.querySelector('.ammo'),
       ammoWarn: $('ammo-warning'), stage: $('mission-stage'), missionText: $('mission-text'), arrow: $('objective-arrow'),
-      dist: $('objective-dist'), threatCount: $('threat-count'), threat: $('threat'), left: $('zombies-left'), kills: $('kills'),
+      dist: $('objective-dist'), heading: $('heading'), objective: this.root.querySelector('.objective'), threatCount: $('threat-count'), threat: $('threat'), left: $('zombies-left'), kills: $('kills'),
       toasts: $('toasts'), hit: $('hitmarker'), danger: $('vignette-danger'), hurt: $('vignette-hurt'), radar: $('radar'),
     };
     this.slots = [1, 2].map((n) => ({ box: this.root.querySelector(`.slot[data-slot="${n}"]`), name: $(`slot${n}-name`), ammo: $(`slot${n}-ammo`) }));
@@ -49,10 +49,19 @@ export class HUD {
     this._set('mtext', this.el.missionText, text);
   }
 
-  /** Distancia al objetivo y flecha relativa a hacia dónde mira el jugador. */
-  setObjective(distance, relativeAngle) {
-    this._set('dist', this.el.dist, `${Math.round(distance)} m a la extracción`);
-    this.el.arrow.style.transform = `rotate(${relativeAngle - Math.PI / 2}rad)`;
+  setHeading(name) {
+    this._set('heading', this.el.heading, name);
+  }
+
+  /**
+   * Señal de radio de la extracción. Lejos: solo una dirección aproximada. Cerca ("señal fuerte"):
+   * distancia y flecha relativa a hacia dónde mira el jugador.
+   */
+  setSignal(strong, distance, relativeAngle, cardinal) {
+    this.el.arrow.style.display = strong ? 'inline-block' : 'none';
+    this.el.objective.classList.toggle('strong', strong);
+    this._set('dist', this.el.dist, strong ? `Señal fuerte: ${Math.round(distance)} m` : `Señal débil hacia el ${cardinal}`);
+    if (strong) this.el.arrow.style.transform = `rotate(${relativeAngle - Math.PI / 2}rad)`;
   }
 
   setCounts(left, kills) {

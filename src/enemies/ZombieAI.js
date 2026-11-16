@@ -14,9 +14,14 @@ export const ZombieState = Object.freeze({
 });
 
 export class ZombieAI {
-  /** @param {import('../systems/CollisionSystem.js').CollisionSystem} collision */
-  constructor(collision) {
+  /**
+   * @param {import('../systems/CollisionSystem.js').CollisionSystem} collision
+   * @param {import('./FlowField.js').FlowField} [flow] pathfinding opcional (sin él, persecución en línea recta)
+   */
+  constructor(collision, flow = null) {
     this.collision = collision;
+    this.flow = flow;
+    this._dir = { x: 0, z: 0 };
   }
 
   /** Actualiza el estado (INACTIVO/ACTIVO) según la distancia al jugador. Devuelve el estado. */
@@ -39,8 +44,12 @@ export class ZombieAI {
     const dist = Math.hypot(dx, dz) || 1;
     dx /= dist; dz /= dist;
 
-    // Si estuvo atascado contra una pared, rodear unos instantes (gira la dirección ±70°)
-    if (zombie.steerTimer > 0) {
+    // Lejos del jugador se sigue el campo de flujo (rodea edificios); de cerca, línea recta
+    const usedFlow = this.flow && dist > 4 && this.flow.direction(px, pz, this._dir);
+    if (usedFlow) { dx = this._dir.x; dz = this._dir.z; }
+
+    // Sin pathfinding: si estuvo atascado contra una pared, rodear unos instantes (gira la dirección ±70°)
+    if (!usedFlow && zombie.steerTimer > 0) {
       zombie.steerTimer -= dt;
       const a = zombie.steerSign * 1.2;
       const c = Math.cos(a), s = Math.sin(a);

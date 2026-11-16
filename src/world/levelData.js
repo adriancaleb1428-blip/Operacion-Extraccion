@@ -1,26 +1,57 @@
 /**
- * DATOS DEL NIVEL (posiciones, distribución de zombis, suministros, obstáculos).
- * Es solo datos + utilidades puras (sin three.js) para poder validarlos en tests.
+ * DATOS DEL NIVEL (calles, edificios, vehículos, zombis, suministros).
+ * Todo se genera de forma DETERMINISTA (semillas fijas): el mundo es siempre el mismo.
+ * Es solo datos + utilidades puras (sin three.js) para poder validarlo en tests.
  *
- * Sistema de coordenadas: X = este(+)/oeste(-),  Z = sur(+)/norte(-).  El jugador empieza al sur
- * (z ≈ +96) mirando al norte (-Z) y debe llegar a la zona de extracción en z ≈ -92.
+ * Coordenadas: X = este(+)/oeste(-),  Z = sur(+)/norte(-).
+ * El jugador empieza al SUR (z ≈ +150) y la zona de extracción está ESCONDIDA al NORESTE,
+ * dentro de un recinto amurallado con una única entrada (ver EXT_COMPOUND / EXT_GATE).
  */
 
-export const WORLD = { minX: -100, maxX: 100, minZ: -106, maxZ: 106 };
+export const WORLD = { minX: -160, maxX: 160, minZ: -160, maxZ: 160 };
 
-// Calles: avenidas N-S (x) y calles transversales E-O (z), con su ancho.
-export const AVENUES = [{ x: -60, w: 12 }, { x: 0, w: 14 }, { x: 60, w: 12 }];
-export const CROSS_STREETS = [{ z: 70, w: 12 }, { z: 30, w: 12 }, { z: -10, w: 12 }, { z: -50, w: 12 }];
+// ---------- calles ----------
+export const AVENUES = [-110, -55, 0, 55, 110].map((x) => ({ x, w: x === 0 ? 14 : 12 }));      // N-S
+export const CROSS_STREETS = [-110, -55, 0, 55, 110].map((z) => ({ z, w: 12 }));                 // E-O (ascendente en z)
 
-// Manzanas (espacios entre calles)
-export const BLOCK_X = [[-100, -66], [-54, -7], [7, 54], [66, 100]];
-export const BLOCK_Z = [[76, 106], [36, 64], [-4, 24], [-44, -16], [-106, -56]];
+/** Tramos libres entre calles (las manzanas). */
+function gaps(min, max, roads, key) {
+  const out = [];
+  let cur = min;
+  for (const r of roads) {
+    out.push([cur, r[key] - r.w / 2]);
+    cur = r[key] + r.w / 2;
+  }
+  out.push([cur, max]);
+  return out;
+}
+export const BLOCK_X = gaps(WORLD.minX, WORLD.maxX, AVENUES, 'x');            // oeste -> este
+export const BLOCK_Z = gaps(WORLD.minZ, WORLD.maxZ, CROSS_STREETS, 'z');      // norte -> sur
 
-export const PLAYER_START = { x: 0, z: 96, yaw: 0 };
-export const EXTRACTION = { x: 0, z: -92, radius: 5 };
-export const SAFE_ZONE = { x1: -18, x2: 18, z1: 84, z2: 104, gateHalfWidth: 5 };
+// Tipo de cada manzana [fila norte->sur][columna oeste->este]
+//  b = edificios · park/parking/construction/containers = patios abiertos · START = zona segura · EXT = extracción
+const KINDS = [
+  ['b', 'b', 'b', 'b', 'b', 'EXT'],
+  ['b', 'b', 'b', 'b', 'construction', 'b'],
+  ['b', 'parking', 'b', 'containers', 'b', 'b'],
+  ['b', 'b', 'park', 'parking', 'b', 'b'],
+  ['b', 'construction', 'b', 'b', 'containers', 'b'],
+  ['b', 'b', 'START', 'START', 'b', 'b'],
+];
+const blockRect = (ix, iz) => ({ x1: BLOCK_X[ix][0], x2: BLOCK_X[ix][1], z1: BLOCK_Z[iz][0], z2: BLOCK_Z[iz][1] });
 
-// ---------- generador pseudoaleatorio con semilla (el mundo es siempre el mismo) ----------
+// ---------- puntos clave ----------
+export const PLAYER_START = { x: 0, z: 150, yaw: 0 };
+export const SAFE_ZONE = { x1: -18, x2: 18, z1: 128, z2: 156, gateHalfWidth: 5 };
+export const POLE = { x: -8, z: SAFE_ZONE.z1 + 6 };   // poste del reflector
+
+// Zona de extracción ESCONDIDA: recinto amurallado en la esquina nordeste, entrada por el lado oeste.
+export const EXT_COMPOUND = { x1: 122, x2: 156, z1: -156, z2: -122 };
+export const EXT_GATE = { z1: -146, z2: -141 };        // hueco de 5 m en el muro oeste
+export const EXTRACTION = { x: 142, z: -140, radius: 5 };
+export const HELICOPTER = { x: 150, z: -150, L: 8, W: 2.6, H: 3.2 };
+
+// ---------- generador pseudoaleatorio con semilla ----------
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return () => {
@@ -31,6 +62,18 @@ export function mulberry32(seed) {
   };
 }
 
+// ---------- tamaños ----------
+export const VEHICLE_SIZES = {
+  car: { L: 4.4, W: 1.9, H: 1.5 },
+  van: { L: 5.2, W: 2.1, H: 2.1 },
+  truck: { L: 7.5, W: 2.5, H: 3.0 },
+  bus: { L: 11, W: 2.6, H: 3.2 },
+  wreck: { L: 4.2, W: 1.9, H: 1.3 },
+};
+export const CONTAINER_SIZE = { L: 6.1, W: 2.44, H: 2.6 };
+const CAR_COLORS = [0x7a2020, 0x2f4f6f, 0x3a5a3a, 0x8a8a8a, 0xb0a070, 0x9a7a1a, 0x6a2a6a, 0x4a5a6a, 0x5a1a1a, 0x8a6a2a, 0x2a2a3a, 0x1f4a4a, 0x7a7a2a, 0x3a3a3a, 0x8a2a2a, 0x6a6a7a];
+
+// ======================================================================= EDIFICIOS
 /** Divide un rectángulo en nx*nz solares separados por callejones de `gap` metros. */
 function splitLots(x1, x2, z1, z2, nx, nz, gap, rng, hMin, hMax, inset = 1) {
   const lots = [];
@@ -40,239 +83,190 @@ function splitLots(x1, x2, z1, z2, nx, nz, gap, rng, hMin, hMax, inset = 1) {
     for (let j = 0; j < nz; j++) {
       const bx1 = x1 + inset + i * (wx + gap);
       const bz1 = z1 + inset + j * (wz + gap);
-      lots.push({
-        x1: bx1, x2: bx1 + wx, z1: bz1, z2: bz1 + wz,
-        h: Math.round(hMin + rng() * (hMax - hMin)),
-        style: Math.floor(rng() * 3),
-      });
+      lots.push({ x1: bx1, x2: bx1 + wx, z1: bz1, z2: bz1 + wz, h: Math.round(hMin + rng() * (hMax - hMin)), style: Math.floor(rng() * 3) });
     }
   }
   return lots;
 }
 
-/** Edificios del nivel. */
 export function generateBuildings() {
   const rng = mulberry32(20240613);
-  const b = [];
-  const [c0, c1, c2, c3] = BLOCK_X;
-  const [r0, r1, r2, r3, r4] = BLOCK_Z;
-
-  // Fila sur (inicio): columnas exteriores + flancos de la zona segura
-  b.push(...splitLots(c0[0], c0[1], r0[0], r0[1], 1, 2, 2, rng, 12, 26));
-  b.push(...splitLots(-54, -22, r0[0], r0[1], 1, 2, 2, rng, 10, 22));
-  b.push(...splitLots(22, 54, r0[0], r0[1], 1, 2, 2, rng, 10, 22));
-  b.push(...splitLots(c3[0], c3[1], r0[0], r0[1], 1, 2, 2, rng, 12, 26));
-
-  // Fila 1 (z 36..64): parque en col1 -> sin edificios
-  b.push(...splitLots(c0[0], c0[1], r1[0], r1[1], 1, 2, 2, rng, 14, 34));
-  b.push(...splitLots(c2[0], c2[1], r1[0], r1[1], 2, 1, 2, rng, 16, 36));
-  b.push(...splitLots(c3[0], c3[1], r1[0], r1[1], 1, 2, 2, rng, 14, 30));
-
-  // Fila 2 (z -4..24): estacionamiento en col2
-  b.push(...splitLots(c0[0], c0[1], r2[0], r2[1], 1, 2, 2, rng, 12, 28));
-  b.push(...splitLots(c1[0], c1[1], r2[0], r2[1], 2, 1, 2, rng, 18, 38));
-  b.push(...splitLots(c3[0], c3[1], r2[0], r2[1], 1, 2, 2, rng, 12, 28));
-
-  // Fila 3 (z -44..-16): obra en col1, patio de contenedores en col2
-  b.push(...splitLots(c0[0], c0[1], r3[0], r3[1], 1, 2, 2, rng, 12, 30));
-  b.push(...splitLots(c3[0], c3[1], r3[0], r3[1], 1, 2, 2, rng, 12, 30));
-
-  // Fila norte (extracción): flancos de la plaza
-  b.push(...splitLots(c0[0], c0[1], r4[0], r4[1], 1, 3, 2, rng, 14, 32));
-  b.push(...splitLots(-54, -26, r4[0], r4[1], 1, 3, 2, rng, 14, 30));
-  b.push(...splitLots(26, 54, r4[0], r4[1], 1, 3, 2, rng, 14, 30));
-  b.push(...splitLots(c3[0], c3[1], r4[0], r4[1], 1, 3, 2, rng, 14, 32));
-  return b;
+  const out = [];
+  for (let iz = 0; iz < BLOCK_Z.length; iz++) {
+    for (let ix = 0; ix < BLOCK_X.length; ix++) {
+      const kind = KINDS[iz][ix];
+      const r = blockRect(ix, iz);
+      if (kind === 'b') {
+        const w = r.x2 - r.x1, d = r.z2 - r.z1;
+        out.push(...splitLots(r.x1, r.x2, r.z1, r.z2, w > 60 ? 3 : w > 40 ? 2 : 1, d > 60 ? 3 : d > 40 ? 2 : 1, 2, rng, 12, 34));
+      } else if (kind === 'START') {
+        // Solo flancos: el centro es la zona segura
+        const left = ix === 2;
+        out.push(...splitLots(left ? r.x1 : 22, left ? -22 : r.x2, r.z1, r.z2, 1, 2, 2, rng, 10, 22));
+      }
+    }
+  }
+  return out;
 }
 
-// ---------- VEHÍCULOS ABANDONADOS ----------
-// rot 0 = eje largo en Z; rot 90 = eje largo en X. (Solo ortogonales -> colisiones AABB exactas)
-export const VEHICLE_SIZES = {
-  car: { L: 4.4, W: 1.9, H: 1.5 },
-  van: { L: 5.2, W: 2.1, H: 2.1 },
-  truck: { L: 7.5, W: 2.5, H: 3.0 },
-  bus: { L: 11, W: 2.6, H: 3.2 },
-  wreck: { L: 4.2, W: 1.9, H: 1.3 },
-};
+// ======================================================================= PATIOS ABIERTOS
+export function generateYardProps() {
+  const rng = mulberry32(777);
+  const vehicles = [], containers = [], trees = [], rubble = [], benches = [];
+  const color = () => CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)];
 
-export const VEHICLES = [
-  // Calle de acceso (z=70)
-  { t: 'car', x: -30, z: 70, rot: 90, c: 0x7a2020 }, { t: 'van', x: 20, z: 72, rot: 90, c: 0x8a8a8a },
-  { t: 'car', x: 38, z: 68, rot: 90, c: 0x2f4f6f }, { t: 'wreck', x: -45, z: 72, rot: 90, c: 0x4a3a2a },
-  // Avenida central (x=0), de sur a norte
-  { t: 'car', x: -4.5, z: 56, rot: 0, c: 0x3a5a3a }, { t: 'van', x: 3.5, z: 48, rot: 0, c: 0xb0a070 },
-  { t: 'bus', x: -2.5, z: 40, rot: 0, c: 0x9a7a1a }, { t: 'car', x: 4.5, z: 22, rot: 0, c: 0x6a2a6a },
-  { t: 'truck', x: -4, z: 4, rot: 0, c: 0x4a5a6a }, { t: 'bus', x: -1, z: -22, rot: 90, c: 0x5a1a1a },
-  { t: 'car', x: 3, z: -36, rot: 0, c: 0x8a6a2a }, { t: 'car', x: -5, z: -30, rot: 0, c: 0x2a2a3a },
-  // Avenida oeste (x=-60)
-  { t: 'car', x: -62, z: 52, rot: 0, c: 0x7a7a2a }, { t: 'van', x: -57.5, z: 22, rot: 0, c: 0x3a3a3a },
-  { t: 'truck', x: -61, z: -4, rot: 0, c: 0x5a4a3a }, { t: 'car', x: -58, z: -30, rot: 0, c: 0x1f4a4a },
-  { t: 'wreck', x: -62, z: -62, rot: 0, c: 0x4a2a2a },
-  // Avenida este (x=60)
-  { t: 'car', x: 57.5, z: 52, rot: 0, c: 0x4a2a5a }, { t: 'car', x: 62, z: 8, rot: 0, c: 0x8a2a2a },
-  { t: 'van', x: 58, z: -20, rot: 0, c: 0x6a6a7a }, { t: 'bus', x: 61, z: -48, rot: 0, c: 0x2a5a3a },
-  // Calles transversales
-  { t: 'car', x: -30, z: 28, rot: 90, c: 0x9a9a3a }, { t: 'car', x: 30, z: 33, rot: 90, c: 0x3a6a8a },
-  { t: 'van', x: -42, z: 32, rot: 90, c: 0x7a4a2a }, { t: 'car', x: 44, z: 28, rot: 90, c: 0x5a5a5a },
-  { t: 'car', x: -30, z: -9, rot: 90, c: 0x8a3a3a }, { t: 'truck', x: 35, z: -12, rot: 90, c: 0x3a4a3a },
-  { t: 'car', x: -44, z: -8, rot: 90, c: 0x2a4a7a }, { t: 'car', x: 25, z: -50, rot: 90, c: 0x6a5a2a },
-  { t: 'car', x: -35, z: -48, rot: 90, c: 0x5a2a2a }, { t: 'wreck', x: 46, z: -52, rot: 90, c: 0x3a3a2a },
-  // Plaza de extracción
-  { t: 'car', x: -12, z: -66, rot: 90, c: 0x7a2020 }, { t: 'car', x: 10, z: -72, rot: 0, c: 0x4a4a4a },
-  { t: 'van', x: -6, z: -80, rot: 0, c: 0x8a7a5a }, { t: 'car', x: 15, z: -84, rot: 90, c: 0x2a3a5a },
-  { t: 'wreck', x: -16, z: -88, rot: 90, c: 0x4a3a3a },
-];
+  for (let iz = 0; iz < BLOCK_Z.length; iz++) {
+    for (let ix = 0; ix < BLOCK_X.length; ix++) {
+      const kind = KINDS[iz][ix];
+      const r = blockRect(ix, iz);
+      const w = r.x2 - r.x1, h = r.z2 - r.z1, cx = (r.x1 + r.x2) / 2, cz = (r.z1 + r.z2) / 2;
 
-// ---------- BARRERAS Y OBSTÁCULOS ----------
-// type: jersey (barrera de concreto), crate, dumpster, sandbag, barrel (barril con fuego), lamp
-// w/d = tamaño en X/Z (m). Se colocan axis-aligned.
-export const BARRIERS = [
-  // Retén en la avenida central (z=10): paso libre de ~3 m en el centro
-  { t: 'jersey', x: -4.4, z: 10, w: 5.2, d: 0.7 }, { t: 'jersey', x: 4.9, z: 10, w: 4.2, d: 0.7 },
-  { t: 'sandbag', x: -1.2, z: 8.6, w: 1.6, d: 0.7 },
-  // Acceso a la plaza (z=-62)
-  { t: 'jersey', x: -14, z: -62, w: 20, d: 0.7 }, { t: 'jersey', x: 14, z: -62, w: 20, d: 0.7 },
-  // Zona segura: sacos y barricadas junto a la puerta
-  { t: 'sandbag', x: -8.5, z: 84, w: 7, d: 0.9 }, { t: 'sandbag', x: 8.5, z: 84, w: 7, d: 0.9 },
-  // Cajas / contenedores de basura en calles
-  { t: 'dumpster', x: -20, z: 74, w: 2.4, d: 1.4 }, { t: 'dumpster', x: 46, z: 74, w: 2.4, d: 1.4 },
-  { t: 'crate', x: 12, z: 64.5, w: 1.4, d: 1.4 }, { t: 'crate', x: -48, z: 36, w: 1.4, d: 1.4 },
-  { t: 'crate', x: 52, z: 31, w: 1.4, d: 1.4 }, { t: 'dumpster', x: 20, z: -4.5, w: 2.4, d: 1.4 },
-  { t: 'jersey', x: -58, z: 38, w: 4, d: 0.7 }, { t: 'jersey', x: 58, z: 34, w: 4, d: 0.7 },
-  { t: 'jersey', x: -20, z: -50, w: 4, d: 0.7 }, { t: 'crate', x: 8, z: -46, w: 1.4, d: 1.4 },
-  { t: 'sandbag', x: 3, z: -14, w: 4, d: 0.8 }, { t: 'dumpster', x: -32, z: -44.5, w: 2.4, d: 1.4 },
-  // Plaza
-  { t: 'crate', x: -8, z: -70, w: 1.4, d: 1.4 }, { t: 'crate', x: 4, z: -76, w: 1.4, d: 1.4 },
-  { t: 'sandbag', x: 0, z: -84, w: 6, d: 0.8 },
-];
+      if (kind === 'parking') {
+        for (const z of [r.z1 + h * 0.25, r.z1 + h * 0.75]) {
+          for (let x = r.x1 + 8; x <= r.x2 - 6; x += 7) {
+            if (rng() < 0.22) continue; // plazas vacías
+            vehicles.push({ t: rng() < 0.2 ? 'van' : 'car', x, z, rot: 0, c: color() });
+          }
+        }
+      } else if (kind === 'containers') {
+        for (const z of [r.z1 + 8, r.z2 - 8]) {
+          for (let x = r.x1 + 9; x <= r.x2 - 8; x += 11) containers.push({ x, z, rot: 90, c: color(), stacked: rng() < 0.4 });
+        }
+        containers.push({ x: r.x1 + w * 0.3, z: cz, rot: 90, c: 0x7a3a1a, stacked: false }, { x: r.x1 + w * 0.72, z: cz, rot: 90, c: 0x2a5a5a, stacked: true });
+      } else if (kind === 'construction') {
+        containers.push({ x: r.x1 + w * 0.2, z: r.z1 + h * 0.18, rot: 90, c: 0x9a6a1a, stacked: false }, { x: r.x1 + w * 0.65, z: r.z1 + h * 0.3, rot: 90, c: 0x3a5a7a, stacked: false }, { x: r.x1 + w * 0.8, z: r.z1 + h * 0.8, rot: 90, c: 0x5a3a3a, stacked: true });
+        rubble.push({ x: r.x1 + w * 0.3, z: r.z1 + h * 0.65, w: 5, d: 3.4, h: 1.3 }, { x: r.x1 + w * 0.75, z: r.z1 + h * 0.55, w: 3.6, d: 4, h: 1.1 }, { x: r.x1 + w * 0.45, z: r.z1 + h * 0.85, w: 3, d: 2.6, h: 0.9 });
+      } else if (kind === 'park') {
+        const fountain = { x: cx, z: cz, w: 5, d: 5, h: 1.2 };
+        rubble.push(fountain);
+        for (let i = 0; i < 18; i++) {
+          const x = r.x1 + 4 + rng() * (w - 8), z = r.z1 + 4 + rng() * (h - 8);
+          if (Math.hypot(x - fountain.x, z - fountain.z) < 6) continue;
+          trees.push({ x, z, h: 4 + rng() * 3 });
+        }
+        benches.push({ x: cx + 8, z: cz, w: 1.8, d: 0.6 }, { x: cx - 8, z: cz + 6, w: 0.6, d: 1.8 }, { x: cx, z: cz - 9, w: 1.8, d: 0.6 });
+      }
+    }
+  }
+  return { vehicles, containers, trees, rubble, benches };
+}
+
+// ======================================================================= CALLES
+const nearRoad = (v, roads, key, margin) => roads.some((r) => Math.abs(v - r[key]) < r.w / 2 + margin);
+const inStartArea = (x, z) => z > 112 && Math.abs(x) < 30;
+const inExtArea = (x, z) => x > 112 && z < -112;
+
+/** Vehículos abandonados en avenidas y calles transversales. rot 0 = eje largo en Z, 90 = en X. */
+export const VEHICLES = (() => {
+  const rng = mulberry32(1337);
+  const out = [];
+  const pick = () => { const r = rng(); return r < 0.55 ? 'car' : r < 0.7 ? 'van' : r < 0.8 ? 'truck' : r < 0.87 ? 'bus' : 'wreck'; };
+  for (const a of AVENUES) {
+    for (let z = -150; z < 150; z += 22 + rng() * 14) {
+      if (nearRoad(z, CROSS_STREETS, 'z', 9) || inStartArea(a.x, z) || inExtArea(a.x, z)) continue;
+      out.push({ t: pick(), x: a.x + (rng() < 0.5 ? -1 : 1) * (2.4 + rng() * 2), z, rot: 0, c: CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)] });
+    }
+  }
+  for (const s of CROSS_STREETS) {
+    for (let x = -150; x < 150; x += 24 + rng() * 14) {
+      if (nearRoad(x, AVENUES, 'x', 9) || inStartArea(x, s.z) || inExtArea(x, s.z)) continue;
+      const t = pick() === 'bus' ? 'car' : pick();
+      out.push({ t, x, z: s.z + (rng() < 0.5 ? -1 : 1) * (2.2 + rng() * 2), rot: 90, c: CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)] });
+    }
+  }
+  return out;
+})();
+
+// ---------- barreras y obstáculos ----------
+// type: jersey (concreto), crate, dumpster, sandbag. w/d = tamaño en X/Z. Siempre alineadas a los ejes.
+export const BARRIERS = (() => {
+  const rng = mulberry32(4711);
+  const out = [];
+  // Retenes (chokepoints) en las avenidas: línea de barreras con un paso de 3 m en el centro
+  const chokes = [[0, 80], [0, 28], [0, -30], [0, -80], [-55, 30], [-55, -80], [55, 80], [55, -30], [110, 30], [-110, -30], [110, -80], [-55, 130], [-110, 80], [55, 135]];
+  for (const [ax, z] of chokes) {
+    const a = AVENUES.find((v) => v.x === ax);
+    const segW = a.w / 2 - 1.5;
+    out.push({ t: 'jersey', x: ax - 1.5 - segW / 2, z, w: segW, d: 0.7 }, { t: 'jersey', x: ax + 1.5 + segW / 2, z, w: segW, d: 0.7 });
+  }
+  // Puerta de la zona segura
+  const s = SAFE_ZONE;
+  out.push({ t: 'sandbag', x: -8.5, z: s.z1, w: 7, d: 0.9 }, { t: 'sandbag', x: 8.5, z: s.z1, w: 7, d: 0.9 });
+  // Contenedores de basura y cajas en los bordes de las calles
+  for (let i = 0; i < 70; i++) {
+    const avenue = rng() < 0.55;
+    let x, z;
+    if (avenue) { const a = AVENUES[Math.floor(rng() * AVENUES.length)]; x = a.x + (rng() < 0.5 ? -1 : 1) * (a.w / 2 - 1.4); z = -150 + rng() * 300; if (nearRoad(z, CROSS_STREETS, 'z', 2)) continue; }
+    else { const c = CROSS_STREETS[Math.floor(rng() * CROSS_STREETS.length)]; z = c.z + (rng() < 0.5 ? -1 : 1) * (c.w / 2 - 1.4); x = -150 + rng() * 300; if (nearRoad(x, AVENUES, 'x', 2)) continue; }
+    if (inStartArea(x, z) || inExtArea(x, z)) continue;
+    out.push(rng() < 0.4 ? { t: 'dumpster', x, z, w: 2.4, d: 1.4 } : { t: 'crate', x, z, w: 1.4, d: 1.4 });
+  }
+  // Interior del recinto de extracción: algo de cobertura (sin bloquear el camino de la puerta al helipuerto)
+  out.push({ t: 'jersey', x: 131, z: -131, w: 4, d: 0.7 }, { t: 'crate', x: 128, z: -150, w: 1.4, d: 1.4 }, { t: 'crate', x: 133, z: -152, w: 1.4, d: 1.4 }, { t: 'sandbag', x: 148, z: -128, w: 5, d: 0.8 });
+  return out;
+})();
 
 export const FIRE_BARRELS = [
-  { x: -12, z: 92 }, { x: 12, z: 92 }, { x: 5.5, z: -14 }, { x: -3, z: -78 }, { x: -58, z: 20 }, { x: 8, z: -66 },
+  { x: 3, z: -28 }, { x: -3, z: -78 }, { x: 3, z: 82 }, { x: -57, z: 32 }, { x: 57, z: -32 }, { x: 112, z: 32 },
+  { x: 112, z: -82 }, { x: -12, z: 150 }, { x: 12, z: 150 }, { x: 136, z: -126 },
 ];
 
-// Zonas de peligro (decal + advertencia). Son zonas con mayor densidad de zombis.
+// Zonas de peligro (decal + conos). Son zonas con zombis más densos.
 export const HAZARD_ZONES = [
-  { x: 0, z: 2, w: 12, d: 10, label: 'PELIGRO' },
-  { x: -58, z: 20, w: 10, d: 10, label: 'ZONA INFECTADA' },
-  { x: 0, z: -76, w: 16, d: 12, label: 'PELIGRO' },
-  { x: 30, z: 30, w: 8, d: 6, label: 'BIOPELIGRO' },
+  { x: 0, z: 4, w: 12, d: 10, label: 'PELIGRO' },
+  { x: -55, z: 60, w: 10, d: 10, label: 'ZONA INFECTADA' },
+  { x: 55, z: -60, w: 10, d: 10, label: 'BIOPELIGRO' },
+  { x: 0, z: -125, w: 14, d: 10, label: 'PELIGRO' },
+  { x: 110, z: -60, w: 10, d: 10, label: 'ZONA INFECTADA' },
+  { x: -110, z: 100, w: 10, d: 8, label: 'BIOPELIGRO' },
 ];
 
-// Farolas (poste apagado, algunas con luz tenue emisiva)
+/** Farolas en los bordes de las avenidas (dir = hacia dónde apunta el brazo: +1 → +X). */
 export function generateLamps() {
   const lamps = [];
-  for (let z = 100; z > -100; z -= 22) { lamps.push({ x: -8.2, z }); lamps.push({ x: 8.2, z: z - 11 }); }
-  for (const cx of [-60, 60]) for (let z = 80; z > -100; z -= 30) lamps.push({ x: cx + 7, z });
-  return lamps.filter((l) => !(l.z > SAFE_ZONE.z1 - 1 && Math.abs(l.x) < 22));
+  for (const a of AVENUES) {
+    for (const side of [-1, 1]) {
+      for (let z = -150 + (side > 0 ? 16 : 0); z < 150; z += 32) {
+        const x = a.x + side * (a.w / 2 + 0.5);
+        if (nearRoad(z, CROSS_STREETS, 'z', 1.5) || (z > SAFE_ZONE.z1 - 1 && Math.abs(x) < 22)) continue;
+        lamps.push({ x, z, dir: -side });
+      }
+    }
+  }
+  return lamps;
 }
 
-// ---------- ZOMBIS (distribución estratégica; todos empiezan INACTIVOS) ----------
-// detect opcional: sobrescribe la distancia de detección del tipo.
-export const ZOMBIE_SPAWNS = [
-  // Calle de acceso: primer contacto, lejos de la zona segura
-  { x: -24, z: 70, type: 'walker' },
-  { x: 26, z: 71, type: 'walker' },
-  // Avenida central
-  { x: 3, z: 52, type: 'walker' },
-  { x: -5.5, z: 46, type: 'walker' },
-  { x: 30, z: 11, type: 'walker' },                // estacionamiento (emboscada)
-  // Rutas laterales
-  { x: -58, z: 52, type: 'walker' },
-  { x: 58, z: 45, type: 'runner' },
-  { x: -59, z: 10, type: 'walker', detect: 14 },
-  // Retén (chokepoint) de la avenida
-  { x: 0, z: 16, type: 'walker' },
-  { x: 3, z: 4, type: 'runner' },
-  // Centro-norte
-  { x: -34, z: 30, type: 'walker' },
-  { x: 2, z: -17, type: 'lurker' },
-  { x: 30, z: -30, type: 'runner' },              // patio de contenedores
-  { x: -20, z: -48, type: 'walker' },
-  { x: 22, z: -52, type: 'walker' },
-  // Plaza de extracción
-  { x: -3, z: -66, type: 'walker' },
-  { x: 4, z: -68, type: 'walker' },
-  { x: -12, z: -78, type: 'runner' },
-  { x: 14, z: -80, type: 'walker' },
-  { x: 0, z: -88, type: 'lurker' },
-];
-
-// ---------- CAJAS DE MUNICIÓN ----------
-export const AMMO_BOXES = [
-  { weapon: 'rifle', x: 7, z: 79 },   // primera caja, justo fuera de la puerta de la zona segura
-  { weapon: 'pistol', x: -12, z: 70 },
-  { weapon: 'rifle', x: 12, z: 75 },
-  { weapon: 'rifle', x: 5.5, z: 58 },
-  { weapon: 'pistol', x: -63, z: 40 },
-  { weapon: 'rifle', x: -60, z: 12 },
-  { weapon: 'rifle', x: 58, z: 22 },
-  { weapon: 'pistol', x: -20, z: 33 },
-  { weapon: 'rifle', x: 28, z: -9 },
-  { weapon: 'pistol', x: 0, z: -29 },
-  { weapon: 'rifle', x: -30, z: -53 },
-  { weapon: 'pistol', x: 26, z: -48 },
-  { weapon: 'rifle', x: 0, z: -58 },
-];
-
-// ---------- helpers puros ----------
+// ======================================================================= COLISIONADORES
 export const vehicleBox = (v) => {
   const s = VEHICLE_SIZES[v.t];
-  const hx = (v.rot === 90 ? s.L : s.W) / 2;
-  const hz = (v.rot === 90 ? s.W : s.L) / 2;
+  const hx = (v.rot === 90 ? s.L : s.W) / 2, hz = (v.rot === 90 ? s.W : s.L) / 2;
   return { minX: v.x - hx, maxX: v.x + hx, minZ: v.z - hz, maxZ: v.z + hz, minY: 0, maxY: s.H };
 };
-
 export const barrierBox = (b) => ({
   minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2, minY: 0,
   maxY: b.t === 'jersey' ? 1.0 : b.t === 'sandbag' ? 1.1 : b.t === 'dumpster' ? 1.5 : 1.2,
 });
-
-// ---------- PROPS DE MANZANAS ABIERTAS (estacionamiento, parque, obra, patio de contenedores) ----------
-export const CONTAINER_SIZE = { L: 6.1, W: 2.44, H: 2.6 };
-export const HELICOPTER = { x: 0, z: -101, L: 8, W: 2.6, H: 3.2 };
-
-export function generateYardProps() {
-  const rng = mulberry32(777);
-  const vehicles = [], containers = [], trees = [], rubble = [], benches = [];
-  const colors = [0x6a3a2a, 0x2a4a6a, 0x4a5a3a, 0x7a6a2a, 0x5a2a2a, 0x3a3a4a];
-
-  // Estacionamiento: x 7..54, z -4..24 (dos filas de autos con pasillo central)
-  for (const z of [2, 18]) {
-    for (let i = 0; i < 6; i++) {
-      if (rng() < 0.22) continue; // plazas vacías
-      vehicles.push({ t: rng() < 0.2 ? 'van' : 'car', x: 14 + i * 7, z, rot: 0, c: colors[Math.floor(rng() * colors.length)] });
-    }
-  }
-
-  // Patio de contenedores: x 7..54, z -44..-16
-  const cx = [15, 26, 37, 48];
-  for (const z of [-40, -22]) for (const x of cx) containers.push({ x, z, rot: 90, c: colors[Math.floor(rng() * colors.length)], stacked: rng() < 0.4 });
-  containers.push({ x: 21, z: -31, rot: 90, c: 0x7a3a1a, stacked: false }, { x: 42, z: -31, rot: 90, c: 0x2a5a5a, stacked: true });
-
-  // Obra: x -54..-7, z -44..-16
-  containers.push({ x: -46, z: -40, rot: 90, c: 0x9a6a1a, stacked: false }, { x: -28, z: -38, rot: 90, c: 0x3a5a7a, stacked: false }, { x: -20, z: -22, rot: 90, c: 0x5a3a3a, stacked: true });
-  rubble.push({ x: -40, z: -26, w: 5, d: 3.4, h: 1.3 }, { x: -14, z: -34, w: 3.6, d: 4, h: 1.1 }, { x: -34, z: -20, w: 3, d: 2.6, h: 0.9 });
-
-  // Parque: x -54..-7, z 36..64 (árboles secos, fuente destruida, bancas)
-  const fountain = { x: -30, z: 50, w: 5, d: 5, h: 1.2 };
-  rubble.push(fountain);
-  for (let i = 0; i < 16; i++) {
-    const x = -50 + rng() * 40, z = 40 + rng() * 22;
-    if (Math.hypot(x - fountain.x, z - fountain.z) < 6) continue;
-    trees.push({ x, z, h: 4 + rng() * 3 });
-  }
-  benches.push({ x: -22, z: 50, w: 1.8, d: 0.6 }, { x: -38, z: 56, w: 0.6, d: 1.8 }, { x: -44, z: 44, w: 1.8, d: 0.6 });
-  return { vehicles, containers, trees, rubble, benches };
-}
-
 export function containerBox(c) {
-  const hx = (c.rot === 90 ? CONTAINER_SIZE.L : CONTAINER_SIZE.W) / 2;
-  const hz = (c.rot === 90 ? CONTAINER_SIZE.W : CONTAINER_SIZE.L) / 2;
+  const hx = (c.rot === 90 ? CONTAINER_SIZE.L : CONTAINER_SIZE.W) / 2, hz = (c.rot === 90 ? CONTAINER_SIZE.W : CONTAINER_SIZE.L) / 2;
   return { minX: c.x - hx, maxX: c.x + hx, minZ: c.z - hz, maxZ: c.z + hz, minY: 0, maxY: c.stacked ? CONTAINER_SIZE.H * 2 : CONTAINER_SIZE.H };
 }
 
-/** Todos los colisionadores estáticos del mundo (AABB). Los usan WorldBuilder y los tests. */
+/** Muros del recinto de extracción (con el hueco de la entrada en el lado oeste). */
+export function extractionWalls() {
+  const c = EXT_COMPOUND, g = EXT_GATE, t = 0.4, H = 5;
+  return [
+    { minX: c.x1 - t, maxX: c.x2 + t, minZ: c.z2 - t, maxZ: c.z2 + t, minY: 0, maxY: H },            // sur
+    { minX: c.x1 - t, maxX: c.x2 + t, minZ: c.z1 - t, maxZ: c.z1 + t, minY: 0, maxY: H },            // norte
+    { minX: c.x2 - t, maxX: c.x2 + t, minZ: c.z1, maxZ: c.z2, minY: 0, maxY: H },                    // este
+    { minX: c.x1 - t, maxX: c.x1 + t, minZ: c.z1, maxZ: g.z1, minY: 0, maxY: H },                    // oeste (tramo norte)
+    { minX: c.x1 - t, maxX: c.x1 + t, minZ: g.z2, maxZ: c.z2, minY: 0, maxY: H },                    // oeste (tramo sur)
+  ];
+}
+
+let _colliders = null;
+/** Todos los colisionadores estáticos del mundo (AABB). Los usan WorldBuilder, el juego y los tests. */
 export function buildColliders() {
+  if (_colliders) return _colliders.map((c) => ({ ...c }));
   const out = [];
   const add = (b, tag) => out.push({ ...b, tag });
   for (const b of generateBuildings()) add({ minX: b.x1, maxX: b.x2, minZ: b.z1, maxZ: b.z2, minY: 0, maxY: b.h }, 'building');
@@ -292,9 +286,76 @@ export function buildColliders() {
   add({ minX: s.x1, maxX: s.x2, minZ: s.z2 - t, maxZ: s.z2 + t, minY: 0, maxY: 3 }, 'fence');
   add({ minX: s.x1, maxX: -12, minZ: s.z1 - t, maxZ: s.z1 + t, minY: 0, maxY: 3 }, 'fence');
   add({ minX: 12, maxX: s.x2, minZ: s.z1 - t, maxZ: s.z1 + t, minY: 0, maxY: 3 }, 'fence');
-  add({ minX: -8.15, maxX: -7.85, minZ: 89.85, maxZ: 90.15, minY: 0, maxY: 6 }, 'pole'); // poste del reflector
-  // Helicóptero de extracción (decorativo pero sólido)
+  add({ minX: POLE.x - 0.15, maxX: POLE.x + 0.15, minZ: POLE.z - 0.15, maxZ: POLE.z + 0.15, minY: 0, maxY: 6 }, 'pole');
+  // Recinto de extracción + helicóptero
+  for (const w of extractionWalls()) add(w, 'wall');
   const h = HELICOPTER;
   add({ minX: h.x - h.W / 2, maxX: h.x + h.W / 2, minZ: h.z - h.L / 2, maxZ: h.z + h.L / 2, minY: 0, maxY: h.H }, 'helicopter');
-  return out;
+  _colliders = out;
+  return out.map((c) => ({ ...c }));
 }
+
+// ======================================================================= SUMINISTROS Y ZOMBIS
+const _cols = buildColliders();
+const freeAt = (x, z, r) => !_cols.some((c) => {
+  const cx = Math.min(Math.max(x, c.minX), c.maxX), cz = Math.min(Math.max(z, c.minZ), c.maxZ);
+  return (x - cx) ** 2 + (z - cz) ** 2 < r * r;
+});
+const inBounds = (x, z, m = 4) => x > WORLD.minX + m && x < WORLD.maxX - m && z > WORLD.minZ + m && z < WORLD.maxZ - m;
+const inSafe = (x, z) => x > SAFE_ZONE.x1 - 3 && x < SAFE_ZONE.x2 + 3 && z > SAFE_ZONE.z1 - 3;
+const inExtCompound = (x, z, m = 0) => x > EXT_COMPOUND.x1 - m && x < EXT_COMPOUND.x2 + m && z > EXT_COMPOUND.z1 - m && z < EXT_COMPOUND.z2 + m;
+
+function streetPoint(rng) {
+  if (rng() < 0.5) {
+    const a = AVENUES[Math.floor(rng() * AVENUES.length)];
+    return { x: a.x + (rng() - 0.5) * (a.w - 3), z: WORLD.minZ + 8 + rng() * (WORLD.maxZ - WORLD.minZ - 16) };
+  }
+  const s = CROSS_STREETS[Math.floor(rng() * CROSS_STREETS.length)];
+  return { x: WORLD.minX + 8 + rng() * (WORLD.maxX - WORLD.minX - 16), z: s.z + (rng() - 0.5) * (s.w - 3) };
+}
+
+/** Cajas de munición (una por arma): repartidas por las calles, separadas ≥ 24 m. */
+export const AMMO_BOXES = (() => {
+  const rng = mulberry32(9001);
+  const out = [{ weapon: 'rifle', x: 3.5, z: 123 }, { weapon: 'pistol', x: -3.5, z: 123 }]; // fuera de la puerta de la zona segura
+  for (let tries = 0; tries < 6000 && out.length < 32; tries++) {
+    const p = streetPoint(rng);
+    if (!inBounds(p.x, p.z) || inSafe(p.x, p.z) || inExtCompound(p.x, p.z, 6) || !freeAt(p.x, p.z, 1.0)) continue;
+    if (out.some((b) => Math.hypot(b.x - p.x, b.z - p.z) < 24)) continue;
+    out.push({ weapon: rng() < 0.55 ? 'rifle' : 'pistol', x: +p.x.toFixed(1), z: +p.z.toFixed(1) });
+  }
+  return out;
+})();
+
+/**
+ * Zombis: guardianes cerca de las cajas, grupos en las calles y 4 dentro del recinto de extracción.
+ * Todos empiezan INACTIVOS y a más de 45 m del jugador. `detect` opcional sobrescribe el rango del tipo.
+ */
+export const ZOMBIE_SPAWNS = (() => {
+  const rng = mulberry32(31337);
+  const out = [
+    { x: 134, z: -131, type: 'walker' }, { x: 149, z: -131, type: 'runner' },
+    { x: 131, z: -146, type: 'walker' }, { x: 144, z: -151, type: 'lurker' },
+  ];
+  const type = () => { const r = rng(); return r < 0.64 ? 'walker' : r < 0.84 ? 'runner' : 'lurker'; };
+  const ok = (x, z) => inBounds(x, z) && !inSafe(x, z) && !inExtCompound(x, z, 2)
+    && Math.hypot(x - PLAYER_START.x, z - PLAYER_START.z) > 45 && freeAt(x, z, 0.6)
+    && !out.some((o) => Math.hypot(o.x - x, o.z - z) < 3);
+  // guardianes de cajas
+  for (const b of AMMO_BOXES.slice(2)) {
+    if (rng() > 0.55) continue;
+    const a = rng() * Math.PI * 2, d = 5 + rng() * 4;
+    const x = b.x + Math.cos(a) * d, z = b.z + Math.sin(a) * d;
+    if (ok(x, z)) out.push({ x: +x.toFixed(1), z: +z.toFixed(1), type: type() });
+  }
+  // grupos en las calles hasta completar 50
+  for (let tries = 0; tries < 8000 && out.length < 50; tries++) {
+    const p = streetPoint(rng);
+    const n = 1 + Math.floor(rng() * 3);
+    for (let i = 0; i < n && out.length < 50; i++) {
+      const x = p.x + (rng() - 0.5) * 7, z = p.z + (rng() - 0.5) * 7;
+      if (ok(x, z)) out.push({ x: +x.toFixed(1), z: +z.toFixed(1), type: type() });
+    }
+  }
+  return out;
+})();

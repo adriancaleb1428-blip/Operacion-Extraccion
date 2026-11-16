@@ -6,6 +6,7 @@ import { ShootingSystem } from '../src/weapons/ShootingSystem.js';
 import { CollisionSystem } from '../src/systems/CollisionSystem.js';
 import { Zombie } from '../src/enemies/Zombie.js';
 import { ZombieAI, ZombieState } from '../src/enemies/ZombieAI.js';
+import { FlowField } from '../src/enemies/FlowField.js';
 import { ZombieManager } from '../src/enemies/ZombieManager.js';
 import { CONFIG } from '../src/config.js';
 import { WORLD, buildColliders, ZOMBIE_SPAWNS, AMMO_BOXES, PLAYER_START, EXTRACTION } from '../src/world/levelData.js';
@@ -228,4 +229,44 @@ test('nivel: hay suficiente munición en el escenario pero es limitada', () => {
   const pistol = CONFIG.WEAPONS[1].ammo.initial + AMMO_BOXES.filter((b) => b.weapon === 'pistol').length * CONFIG.COLLECTIBLES.ammoBox.pistol;
   assert.ok(rifle + pistol >= need, `munición total ${rifle + pistol} < impactos para matar a todos (${need})`);
   assert.ok(rifle + pistol < need * 3.5, 'la munición no debe ser abundante');
+});
+
+// ---------- modo caza y pathfinding ----------
+test('RF05: el modo caza amplía la detección y se revierte al reiniciar', () => {
+  const z = makeZombie(0, 0, 'walker');
+  const base = z.detectionRange;
+  z.setHunt(CONFIG.HUNT);
+  assert.equal(z.detectionRange, Math.max(base, CONFIG.HUNT.range));
+  assert.ok(z.detectionRange >= CONFIG.HUNT.range);
+  z.reset();
+  assert.equal(z.detectionRange, base, 'el reinicio restaura el rango propio');
+});
+
+test('RF05: un zombi en modo caza se activa y llega al jugador rodeando un edificio', () => {
+  const c = new CollisionSystem({ minX: -60, maxX: 60, minZ: -60, maxZ: 60 });
+  c.addBoxes([{ minX: -2, maxX: 2, minZ: -30, maxZ: 6, minY: 0, maxY: 10, tag: 'building' }]);
+  const flow = new FlowField(c);
+  const ai = new ZombieAI(c, flow);
+  const z = makeZombie(0, -40, 'walker');
+  z.setHunt(CONFIG.HUNT);
+  const player = { x: 0, z: 10 };
+  let activated = false;
+  for (let t = 0; t < 120; t += 1 / 30) {
+    flow.update(player, 1 / 30);
+    ai.update(z, player, 1 / 30);
+    activated ||= z.state === ZombieState.ACTIVE;
+    if (Math.hypot(z.position.x - player.x, z.position.z - player.z) < 1.5) break;
+  }
+  assert.ok(activated, 'debe activarse a 50 m en modo caza');
+  assert.ok(Math.hypot(z.position.x - player.x, z.position.z - player.z) < 3, 'no llegó al jugador (se atascó en el edificio)');
+});
+
+test('nivel: la zona de extracción está escondida (lejos y sin línea de visión inicial) y el camino pasa por la puerta', () => {
+  const d = Math.hypot(EXTRACTION.x - PLAYER_START.x, EXTRACTION.z - PLAYER_START.z);
+  assert.ok(d > CONFIG.mission.finalStageDistance * 2, `extracción demasiado cerca (${d.toFixed(0)} m)`);
+  const c = makeCollision();
+  c.addBoxes(buildColliders());
+  // un jugador en el centro de la extracción no se sale del recinto sin cruzar la puerta: el BFS anterior ya lo prueba;
+  // aquí comprobamos que hay muro (colisionadores 'wall') alrededor
+  assert.ok(buildColliders().filter((b) => b.tag === 'wall').length >= 3, 'faltan muros del recinto');
 });

@@ -21,10 +21,10 @@ Capturas / clips sugeridos para demostrar cada requerimiento funcional. Usa `npm
 | 13 | **Caja de munición** (haz de luz) y el **mensaje "+8 munición"** al recogerla | Acercarse a una caja | RF10 |
 | 14 | **GAME OVER** con botones Reiniciar / Menú | Dejar que un zombi te toque | RF09 |
 | 15 | Partida **reiniciada** (munición inicial, zombis en su sitio, cajas de nuevo) | Botón REINICIAR | RF09 |
-| 16 | **Etapa FINAL**: haz verde de la extracción, misión "FINAL", distancia | Acercarse a la plaza norte | RF08 |
+| 16 | **Etapa FINAL**: haz verde de la extracción, misión "FINAL", distancia | Acercarse al recinto de extracción (noreste) | RF08 |
 | 17 | **¡MISIÓN COMPLETADA!** — "Has llegado a la zona de extracción." | Entrar al círculo verde | RF08 |
 | 18 | **Consola del navegador** (F12) con el reporte `[Recursos 3D]` | F12 → Console | RF04 / Recursos |
-| 19 | **Terminal** con `npm test` (22 pruebas OK) y `npm run build` | Terminal | Pruebas |
+| 19 | **Terminal** con `npm test` (25 pruebas OK) y `npm run build` | Terminal | Pruebas |
 | 20 | **Explorador de archivos / README**: estructura modular `src/` y carpeta `public/assets/models` | Editor | Arquitectura |
 | 21 | **Instalación limpia**: `npm install` + `npm run dev` | Terminal | Pruebas (#15) |
 

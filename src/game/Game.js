@@ -24,10 +24,13 @@ import { GameOverScreen } from '../ui/GameOverScreen.js';
 import { VictoryScreen } from '../ui/VictoryScreen.js';
 
 const STAGE_TEXT = {
-  [MissionStage.START]: 'Sal de la zona segura por la puerta norte y avanza hacia la luz verde.',
-  [MissionStage.DEVELOPMENT]: 'Cruza la ciudad: recoge munición, evita o elimina a los zombis.',
-  [MissionStage.FINAL]: '¡La zona de extracción está cerca! Entra en el círculo verde.',
+  [MissionStage.START]: 'Sal de la zona segura. La radio capta una señal de rescate al NORESTE: la zona de extracción está escondida.',
+  [MissionStage.DEVELOPMENT]: 'Los zombis te han olido. Cruza la ciudad, junta munición y encuentra la entrada a la zona de extracción.',
+  [MissionStage.FINAL]: '¡Señal fuerte! La estación de rescate está cerca: busca la entrada en su muro.',
 };
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+const compassName = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 
 /**
  * Orquestador del juego: crea los sistemas, conecta eventos y ejecuta el bucle principal.
@@ -93,6 +96,7 @@ export class Game {
     this.input = new InputManager(window);
     this.input.onFire = () => this.handleFire();
     this.input.onSelectSlot = (slot) => this.handleSelectWeapon(slot);
+    this.input.onCycleWeapon = (dir) => this.handleCycleWeapon(dir);
 
     // --- captura de mouse: perderla durante la partida = pausa ---
     const cc = this.player.cameraController;
@@ -202,7 +206,13 @@ export class Game {
     if (stage === this.stage) return;
     this.stage = stage;
     this.hud.setMission(stage, STAGE_TEXT[stage]);
-    this.hud.toast(stage === MissionStage.FINAL ? '¡Zona de extracción a la vista!' : 'Etapa: DESARROLLO — avanza con cuidado', 'mission', 3500);
+    if (stage === MissionStage.DEVELOPMENT) {
+      // MODO CAZA: al salir de la zona segura todos los zombis detectan al jugador desde mucho más lejos
+      this.zombies.setHunt(true);
+      this.hud.toast('¡Los zombis han olido tu salida! Vienen hacia ti', 'warn', 4000);
+    } else {
+      this.hud.toast('¡Señal de rescate fuerte! Busca la entrada', 'mission', 3500);
+    }
   }
 
   // ------------------------------------------------------------------ acciones del jugador
@@ -212,6 +222,13 @@ export class Game {
       this.audio.switchWeapon();
       this.hud.setWeapon(this.weapons.current, this.ammo);
     }
+  }
+
+  /** Rueda del mouse: pasa al arma siguiente/anterior (solo hay 2 armas, así que alterna). */
+  handleCycleWeapon(dir) {
+    const slots = this.weapons.weapons.map((w) => w.slot);
+    const i = slots.indexOf(this.weapons.current.slot);
+    this.handleSelectWeapon(slots[(i + dir + slots.length) % slots.length]);
   }
 
   /** Un clic = un disparo. Sin munición no se dispara. */
@@ -359,9 +376,15 @@ export class Game {
     const th = this.zombies.threat(p, 25);
     this.hud.setThreat(th.count, th.nearest);
     this.hud.setCounts(this.zombies.aliveCount, this.kills);
-    // ángulo del objetivo relativo a hacia dónde mira el jugador
-    const toObj = Math.atan2(-(this.extraction.center.x - p.x), -(this.extraction.center.z - p.z)); // yaw que mira al objetivo
-    this.hud.setObjective(dExtract, yaw - toObj);
+    // Brújula: rumbo hacia donde mira el jugador. La extracción está ESCONDIDA: lejos solo se da una dirección
+    // aproximada (8 puntos cardinales); la distancia y la flecha aparecen únicamente con "señal fuerte" (< 80 m).
+    const ex = this.extraction.center;
+    const heading = compassName((-yaw * 180) / Math.PI);
+    const bearing = (Math.atan2(ex.x - p.x, -(ex.z - p.z)) * 180) / Math.PI;      // 0° = norte, horario
+    const lookBearing = (-yaw * 180) / Math.PI;
+    const rel = ((bearing - lookBearing) * Math.PI) / 180;                        // ángulo del objetivo respecto a la mira
+    this.hud.setHeading(heading);
+    this.hud.setSignal(dExtract < CONFIG.mission.finalStageDistance, dExtract, rel, compassName(bearing));
   }
 
   dispose() {

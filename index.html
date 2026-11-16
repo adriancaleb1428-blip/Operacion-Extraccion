@@ -40,19 +40,20 @@
 
         <div id="panel-instructions" class="panel hidden" role="dialog" aria-label="Instrucciones">
           <h2>INSTRUCCIONES</h2>
-          <p class="lead">Eres uno de los últimos sobrevivientes. Cruza la ciudad abandonada, administra tu munición y llega a la <strong class="ok">zona de extracción</strong> (haz de luz verde al norte).</p>
+          <p class="lead">Eres uno de los últimos sobrevivientes. Cruza la ciudad abandonada, administra tu munición y encuentra la <strong class="ok">zona de extracción</strong>: está escondida al noreste, dentro de un recinto amurallado con una sola entrada. Usa el rumbo y la señal de radio.</p>
           <div class="keys">
             <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Moverse</span></div>
             <div><kbd>Mouse</kbd><span>Apuntar / mirar</span></div>
             <div><kbd>Clic izq.</kbd><span>Disparar (un clic = un disparo)</span></div>
             <div><kbd>1</kbd><span>Arma principal: Fusil de asalto</span></div>
             <div><kbd>2</kbd><span>Arma secundaria: Pistola</span></div>
+            <div><kbd>Rueda</kbd><span>Cambiar de arma</span></div>
             <div><kbd>Esc</kbd><span>Pausa</span></div>
           </div>
           <ul class="tips">
             <li>Cada zombi aguanta <strong>2 impactos</strong>. Si te toca, pierdes.</li>
             <li>No hay recarga: recoge las <strong>cajas de munición</strong> (naranja = fusil, celeste = pistola).</li>
-            <li>Los zombis permanecen inactivos hasta que te acercas. Puedes rodearlos o evitarlos.</li>
+            <li>Los zombis dormitan en la ciudad, pero al salir de la zona segura <strong>olfatean tu salida y vienen hacia ti</strong> desde lejos. Corres más rápido que ellos: úsalo.</li>
           </ul>
           <button class="btn btn-small" data-close>VOLVER</button>
         </div>
@@ -75,9 +76,9 @@
         <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
 
         <div id="mission" class="hud-card">
-          <div class="hud-label">MISIÓN · <span id="mission-stage">INICIO</span></div>
+          <div class="hud-label">MISIÓN · <span id="mission-stage">INICIO</span> · RUMBO <span id="heading" class="heading">N</span></div>
           <div id="mission-text">Sal de la zona segura</div>
-          <div class="objective"><span id="objective-arrow">➤</span><span id="objective-dist">—</span></div>
+          <div class="objective"><span id="objective-arrow" style="display:none">➤</span><span id="objective-dist">—</span></div>
         </div>
 
         <div id="threat" class="hud-card">

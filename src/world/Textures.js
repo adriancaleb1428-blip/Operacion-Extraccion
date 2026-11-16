@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AVENUES, CROSS_STREETS, BLOCK_X, BLOCK_Z, WORLD, mulberry32 } from './levelData.js';
+import { AVENUES, CROSS_STREETS, BLOCK_X, BLOCK_Z, WORLD, SAFE_ZONE, EXT_COMPOUND, mulberry32 } from './levelData.js';
 
 /** Texturas generadas con canvas (no se requieren archivos de imagen). */
 
@@ -29,7 +29,7 @@ function speckle(g, w, h, rng, count, alpha, light = 255) {
 
 /** Textura del suelo de toda la ciudad: asfalto, aceras, líneas, pasos de cebra, manchas y grietas. */
 export function createGroundTexture() {
-  const SIZE = 2048;
+  const SIZE = 3072;
   const c = makeCanvas(SIZE, SIZE);
   const g = c.getContext('2d');
   const sx = SIZE / (WORLD.maxX - WORLD.minX);
@@ -41,16 +41,16 @@ export function createGroundTexture() {
   // asfalto
   g.fillStyle = '#2a2c30';
   g.fillRect(0, 0, SIZE, SIZE);
-  speckle(g, SIZE, SIZE, rng, 60000, 0.35, 140);
+  speckle(g, SIZE, SIZE, rng, 140000, 0.35, 140);
 
   // manzanas = acera de concreto
   g.fillStyle = '#585a5c';
   for (const [x1, x2] of BLOCK_X) for (const [z1, z2] of BLOCK_Z) g.fillRect(X(x1), Z(z1), X(x2) - X(x1), Z(z2) - Z(z1));
   // plaza y zona segura (suelo de concreto claro) conectados con la acera
   g.fillStyle = '#4d4f52';
-  g.fillRect(X(-24), Z(-106), X(24) - X(-24), Z(-56) - Z(-106));
-  g.fillRect(X(-22), Z(76), X(22) - X(-22), Z(106) - Z(76));
-  speckle(g, SIZE, SIZE, rng, 30000, 0.25, 160);
+  g.fillRect(X(-22), Z(SAFE_ZONE.z1 - 12), X(22) - X(-22), Z(WORLD.maxZ) - Z(SAFE_ZONE.z1 - 12));   // zona segura
+  g.fillRect(X(EXT_COMPOUND.x1 - 4), Z(EXT_COMPOUND.z1 - 4), X(EXT_COMPOUND.x2 + 4) - X(EXT_COMPOUND.x1 - 4), Z(EXT_COMPOUND.z2 + 4) - Z(EXT_COMPOUND.z1 - 4)); // recinto de extracción
+  speckle(g, SIZE, SIZE, rng, 70000, 0.25, 160);
 
   // bordillos
   g.strokeStyle = '#8a8c8e';
@@ -78,7 +78,7 @@ export function createGroundTexture() {
   }
 
   // manchas de aceite, sangre seca y grietas
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 220; i++) {
     const x = rng() * SIZE, z = rng() * SIZE, r = 6 + rng() * 26;
     const grad = g.createRadialGradient(x, z, 0, x, z, r);
     const blood = rng() < 0.3;
@@ -89,7 +89,7 @@ export function createGroundTexture() {
   }
   g.strokeStyle = 'rgba(8,8,10,0.7)';
   g.lineWidth = 1.5;
-  for (let i = 0; i < 160; i++) {
+  for (let i = 0; i < 380; i++) {
     let x = rng() * SIZE, z = rng() * SIZE;
     g.beginPath(); g.moveTo(x, z);
     for (let k = 0; k < 6; k++) { x += (rng() - 0.5) * 40; z += (rng() - 0.5) * 40; g.lineTo(x, z); }

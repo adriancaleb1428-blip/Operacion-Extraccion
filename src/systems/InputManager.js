@@ -13,6 +13,8 @@ export class InputManager {
     this.look = { x: 0, y: 0 }; // acumulado de movimiento del mouse (para la inercia del arma)
     this.onFire = null;         // () => void
     this.onSelectSlot = null;   // (slot:number) => void
+    this.onCycleWeapon = null;  // (dir:+1|-1) => void  (rueda del mouse)
+    this._lastWheel = 0;
 
     this._onKeyDown = (e) => {
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
@@ -31,6 +33,15 @@ export class InputManager {
       this.look.x += e.movementX || 0;
       this.look.y += e.movementY || 0;
     };
+    // Rueda del mouse: cambia de arma (con un pequeño límite para que un giro de trackpad no la cambie varias veces)
+    this._onWheel = (e) => {
+      if (!this.enabled) return;
+      e.preventDefault();
+      const now = performance.now();
+      if (Math.abs(e.deltaY) < 1 || now - this._lastWheel < 150) return;
+      this._lastWheel = now;
+      this.onCycleWeapon?.(e.deltaY > 0 ? 1 : -1);
+    };
     this._onBlur = () => this.keys.clear();
     this._onContext = (e) => { if (this.enabled) e.preventDefault(); };
 
@@ -39,6 +50,7 @@ export class InputManager {
     target.addEventListener('mousedown', this._onMouseDown);
     target.addEventListener('mousemove', this._onMouseMove);
     target.addEventListener('contextmenu', this._onContext);
+    target.addEventListener('wheel', this._onWheel, { passive: false });
     window.addEventListener('blur', this._onBlur);
   }
 
@@ -72,6 +84,7 @@ export class InputManager {
     this.target.removeEventListener('mousedown', this._onMouseDown);
     this.target.removeEventListener('mousemove', this._onMouseMove);
     this.target.removeEventListener('contextmenu', this._onContext);
+    this.target.removeEventListener('wheel', this._onWheel);
     window.removeEventListener('blur', this._onBlur);
   }
 }
